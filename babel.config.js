@@ -1,7 +1,7 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: ['babel-preset-expo'],
+    presets: ['babel-preset-expo', 'nativewind/babel'],
     plugins: [
       [
         'module-resolver',
@@ -16,7 +16,7 @@ module.exports = function (api) {
             '@store': './src/store',
             '@theme': './src/theme',
             '@utils': './src/utils',
-            '@types': './src/types',
+            '@app-types': './src/types',
             '@config': './src/config',
             '@navigation': './src/navigation',
             '@api': './src/api',
@@ -27,8 +27,7 @@ module.exports = function (api) {
           },
         },
       ],
-      // Cuando se instale react-native-reanimated (paso de navegación),
-      // agregar 'react-native-reanimated/plugin' como ÚLTIMO plugin aquí.
+      'react-native-worklets/plugin',
     ],
   };
 };

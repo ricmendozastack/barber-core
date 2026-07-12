@@ -53,6 +53,7 @@ const config: ExpoConfig = {
   web: {
     favicon: './assets/favicon.png',
   },
+  plugins: ['expo-secure-store'],
   extra: {
     APP_ENV,
     API_URL: process.env.API_URL || current.apiUrl,

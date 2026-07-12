@@ -12,7 +12,7 @@
       "@store/*": ["./src/store/*"],
       "@theme/*": ["./src/theme/*"],
       "@utils/*": ["./src/utils/*"],
-      "@types/*": ["./src/types/*"],
+      "@app-types/*": ["./src/types/*"],
       "@config/*": ["./src/config/*"],
       "@navigation/*": ["./src/navigation/*"],
       "@api/*": ["./src/api/*"],
@@ -22,5 +22,5 @@
       "@providers/*": ["./src/providers/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
 }
