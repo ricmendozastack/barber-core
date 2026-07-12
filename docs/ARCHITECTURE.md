@@ -2,27 +2,27 @@
 
 > Documento base de arquitectura para el desarrollo de **Barber-core**, una app móvil profesional (iOS + Android) construida con React Native y TypeScript. Diseñado para escalar a múltiples equipos, mantenerse por años y soportar CI/CD desde el día 1.
 
-**Principios rectores:** Clean Architecture por *features*, SOLID, tipado estricto de punta a punta, separación entre estado de servidor y estado de cliente, y "boring technology" — solo librerías maduras y con mantenimiento activo.
+**Principios rectores:** Clean Architecture por _features_, SOLID, tipado estricto de punta a punta, separación entre estado de servidor y estado de cliente, y "boring technology" — solo librerías maduras y con mantenimiento activo.
 
 ---
 
 ## 0. Resumen de decisiones clave
 
-| Decisión | Elección | Alternativa considerada |
-|---|---|---|
-| Framework | **Expo (Prebuild / Dev Client, managed-ish)** | React Native Community CLI (bare) |
-| Lenguaje | **TypeScript 5.x strict** | — |
-| Package manager | **pnpm** | yarn berry, npm |
-| Estado servidor | **TanStack Query** | RTK Query, SWR |
-| Estado cliente | **Zustand** | Redux Toolkit, Jotai, MobX |
-| Navegación | **React Navigation v7** (native-stack + bottom-tabs) | Expo Router |
-| Estilos / Design System | **NativeWind v4 + tokens propios** | Tamagui, Restyle |
-| Persistencia KV | **MMKV** | AsyncStorage |
-| Persistencia relacional/offline | **Drizzle ORM sobre expo-sqlite** | WatermelonDB, Realm |
-| Secretos | **expo-secure-store / react-native-keychain** | — |
-| Testing E2E | **Maestro** | Detox |
-| CI/CD | **GitHub Actions + EAS Build/Submit** | Fastlane + GH Actions (bare) |
-| Error/Crash monitoring | **Sentry** | Bugsnag, Firebase Crashlytics |
+| Decisión                        | Elección                                             | Alternativa considerada           |
+| ------------------------------- | ---------------------------------------------------- | --------------------------------- |
+| Framework                       | **Expo (Prebuild / Dev Client, managed-ish)**        | React Native Community CLI (bare) |
+| Lenguaje                        | **TypeScript 5.x strict**                            | —                                 |
+| Package manager                 | **pnpm**                                             | yarn berry, npm                   |
+| Estado servidor                 | **TanStack Query**                                   | RTK Query, SWR                    |
+| Estado cliente                  | **Zustand**                                          | Redux Toolkit, Jotai, MobX        |
+| Navegación                      | **React Navigation v7** (native-stack + bottom-tabs) | Expo Router                       |
+| Estilos / Design System         | **NativeWind v4 + tokens propios**                   | Tamagui, Restyle                  |
+| Persistencia KV                 | **MMKV**                                             | AsyncStorage                      |
+| Persistencia relacional/offline | **Drizzle ORM sobre expo-sqlite**                    | WatermelonDB, Realm               |
+| Secretos                        | **expo-secure-store / react-native-keychain**        | —                                 |
+| Testing E2E                     | **Maestro**                                          | Detox                             |
+| CI/CD                           | **GitHub Actions + EAS Build/Submit**                | Fastlane + GH Actions (bare)      |
+| Error/Crash monitoring          | **Sentry**                                           | Bugsnag, Firebase Crashlytics     |
 
 ---
 
@@ -30,34 +30,34 @@
 
 ### 1.1 Expo vs React Native CLI
 
-| Criterio | Expo (Prebuild/Dev Client) | RN CLI (bare) |
-|---|---|---|
-| Velocidad de arranque | Muy alta (EAS Build, OTA updates, módulos preconfigurados) | Manual, más control desde el día 1 |
-| Módulos nativos custom | Soportado vía **config plugins** + `expo prebuild` (Continuous Native Generation) | Nativo, sin capas intermedias |
-| CI/CD | EAS Build/Submit listo para usar | Requiere Fastlane + runners propios |
-| OTA updates | `expo-updates` integrado | Requiere CodePush u otra solución |
-| Ecosistema de módulos | expo-camera, expo-notifications, expo-secure-store, expo-sqlite, etc. (mantenidos, testeados en conjunto) | Cada librería community por separado |
-| Riesgo de "eyectar" | Bajo — `prebuild` genera `ios/`/`android/` on-demand, no es una migración irreversible | N/A |
+| Criterio               | Expo (Prebuild/Dev Client)                                                                                | RN CLI (bare)                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Velocidad de arranque  | Muy alta (EAS Build, OTA updates, módulos preconfigurados)                                                | Manual, más control desde el día 1   |
+| Módulos nativos custom | Soportado vía **config plugins** + `expo prebuild` (Continuous Native Generation)                         | Nativo, sin capas intermedias        |
+| CI/CD                  | EAS Build/Submit listo para usar                                                                          | Requiere Fastlane + runners propios  |
+| OTA updates            | `expo-updates` integrado                                                                                  | Requiere CodePush u otra solución    |
+| Ecosistema de módulos  | expo-camera, expo-notifications, expo-secure-store, expo-sqlite, etc. (mantenidos, testeados en conjunto) | Cada librería community por separado |
+| Riesgo de "eyectar"    | Bajo — `prebuild` genera `ios/`/`android/` on-demand, no es una migración irreversible                    | N/A                                  |
 
 **Decisión:** Expo con **Dev Client** (no Expo Go) y `prebuild`/CNG. Esto da lo mejor de ambos mundos: velocidad de desarrollo de Expo + capacidad de añadir cualquier módulo nativo (incluyendo los que requiere `react-native-keychain`, SSL pinning, etc.) sin bloquear el proyecto. Los directorios `ios/` y `android/` se tratan como **artefactos generados** (gitignored) salvo que se necesite un patch nativo puntual (`expo prebuild` + config plugin o `patch-package`).
 
 ### 1.2 Tabla de herramientas base
 
-| Herramienta | Uso | Justificación |
-|---|---|---|
-| **React Native 0.76+** (New Architecture: Fabric + TurboModules por defecto) | Runtime | Mejor performance, interop síncrona JS↔Nativo, es el default desde RN 0.76 |
-| **TypeScript 5.x** (`strict`, `noUncheckedIndexedAccess`) | Tipado | Detecta errores en compilación, contratos de API, autocompletado en equipos grandes |
-| **Node 22 LTS** | Tooling | Versión LTS activa, requerida por Metro/Expo SDK recientes |
-| **pnpm** | Package manager | Instalación por hardlinks (rápido, ahorra disco), `pnpm-lock.yaml` determinista, mejor manejo de monorepos si el proyecto crece a Turborepo |
-| **Hermes** | Motor JS | Motor por defecto de RN, bytecode precompilado (arranque más rápido, menor uso de memoria, dificulta ligeramente la ingeniería inversa) |
-| **Babel** (`babel-preset-expo`) | Transpilación | Incluye soporte para `react-native-reanimated/plugin` (debe ir último), path aliases vía `babel-plugin-module-resolver` |
-| **Metro** | Bundler | Bundler oficial RN; configurar `resolver.sourceExts`/SVG transformer y soporte monorepo si aplica |
-| **ESLint** (`eslint-config-expo` + `@typescript-eslint`) | Linting | Reglas específicas de RN (hooks, no-inline-styles opcional), flat config |
-| **Prettier** | Formato | Formato consistente, integrado con ESLint vía `eslint-config-prettier` (evita conflictos de reglas) |
-| **Husky** | Git hooks | `pre-commit` (lint-staged) y `commit-msg` (commitlint) |
-| **lint-staged** | Lint incremental | Solo lintea/formatea archivos staged, hooks rápidos |
-| **commitlint** + **Conventional Commits** | Estándar de commits | Habilita changelog automático y versionado semántico (semantic-release) |
-| **EditorConfig** | Consistencia de editor | Indentación/EOL uniformes entre IDEs |
+| Herramienta                                                                  | Uso                    | Justificación                                                                                                                               |
+| ---------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **React Native 0.76+** (New Architecture: Fabric + TurboModules por defecto) | Runtime                | Mejor performance, interop síncrona JS↔Nativo, es el default desde RN 0.76                                                                  |
+| **TypeScript 5.x** (`strict`, `noUncheckedIndexedAccess`)                    | Tipado                 | Detecta errores en compilación, contratos de API, autocompletado en equipos grandes                                                         |
+| **Node 22 LTS**                                                              | Tooling                | Versión LTS activa, requerida por Metro/Expo SDK recientes                                                                                  |
+| **pnpm**                                                                     | Package manager        | Instalación por hardlinks (rápido, ahorra disco), `pnpm-lock.yaml` determinista, mejor manejo de monorepos si el proyecto crece a Turborepo |
+| **Hermes**                                                                   | Motor JS               | Motor por defecto de RN, bytecode precompilado (arranque más rápido, menor uso de memoria, dificulta ligeramente la ingeniería inversa)     |
+| **Babel** (`babel-preset-expo`)                                              | Transpilación          | Incluye soporte para `react-native-reanimated/plugin` (debe ir último), path aliases vía `babel-plugin-module-resolver`                     |
+| **Metro**                                                                    | Bundler                | Bundler oficial RN; configurar `resolver.sourceExts`/SVG transformer y soporte monorepo si aplica                                           |
+| **ESLint** (`eslint-config-expo` + `@typescript-eslint`)                     | Linting                | Reglas específicas de RN (hooks, no-inline-styles opcional), flat config                                                                    |
+| **Prettier**                                                                 | Formato                | Formato consistente, integrado con ESLint vía `eslint-config-prettier` (evita conflictos de reglas)                                         |
+| **Husky**                                                                    | Git hooks              | `pre-commit` (lint-staged) y `commit-msg` (commitlint)                                                                                      |
+| **lint-staged**                                                              | Lint incremental       | Solo lintea/formatea archivos staged, hooks rápidos                                                                                         |
+| **commitlint** + **Conventional Commits**                                    | Estándar de commits    | Habilita changelog automático y versionado semántico (semantic-release)                                                                     |
+| **EditorConfig**                                                             | Consistencia de editor | Indentación/EOL uniformes entre IDEs                                                                                                        |
 
 ### 1.3 Ejemplo de configuración Babel
 
@@ -73,7 +73,7 @@ module.exports = function (api) {
         {
           root: ['./src'],
           alias: {
-            '@app': './src/app',
+            '@bootstrap': './src/bootstrap',
             '@components': './src/components',
             '@features': './src/features',
             '@hooks': './src/hooks',
@@ -98,9 +98,11 @@ module.exports = function (api) {
 
 Organización **por capas + por features** ("feature-first" dentro de una capa de aplicación clara). Cada `feature` es un módulo casi autocontenido (screaming architecture: al ver `src/features/`, se entiende de qué trata la app).
 
+> **Nota de nomenclatura:** la carpeta de entry point se llama `bootstrap/`, no `app/`. Expo CLI/Metro tratan cualquier directorio llamado `app` (en la raíz o en `src/`) como root heurístico de **Expo Router** (file-based routing), incluso sin `expo-router` instalado. Como esta arquitectura usa React Navigation de forma explícita (sección 5), se evita ese nombre para no generar falsos positivos ni confundir a futuros colaboradores.
+
 ```
 src/
-├── app/            # Entry point, providers raíz, bootstrapping
+├── bootstrap/      # Entry point, providers raíz, bootstrapping
 ├── navigation/      # Navegadores, linking config, guards
 ├── features/        # Módulos de dominio (auth, booking, barbers, profile...)
 ├── screens/         # Solo si hay pantallas que NO pertenecen a un feature concreto
@@ -130,30 +132,30 @@ e2e/                  # Tests Maestro/Detox
 
 ### 2.1 Responsabilidad de cada carpeta
 
-| Carpeta | Responsabilidad | Reglas de dependencia |
-|---|---|---|
-| `app/` | `App.tsx`, composición de providers, splash/bootstrap, error boundary raíz | Puede importar de cualquier capa |
-| `navigation/` | Stacks, tabs, linking config, `RootParamList` tipado, `AuthGuard` | Importa `features/*/screens`, nunca al revés |
-| `features/<feature>/` | `screens/`, `components/`, `hooks/`, `api/`, `store/`, `types.ts` propios del dominio | No debe importar de otro `feature` directamente (comunicación vía `store` global o eventos) |
-| `screens/` | Pantallas transversales (Splash, NotFound, Maintenance) | — |
-| `components/` | Componentes "tontos" reutilizables (Button, Card, Input) | No conoce features ni API |
-| `hooks/` | Hooks genéricos (`useDebounce`, `useAppState`) | No conoce features |
-| `services/` | Wrappers de SDKs nativos/externos (push, deep link, permisos) | Consumido por `features` y `providers` |
-| `api/` | Instancia Axios, interceptores, definición de endpoints y DTOs | Es la única capa que conoce HTTP |
-| `store/` | Stores Zustand *globales* (sesión, tema, feature flags) | Los stores locales de un feature viven en `features/<feature>/store` |
-| `theme/` | Tokens (color, spacing, typography), `ThemeProvider` | — |
-| `providers/` | Composición: `QueryClientProvider`, `ThemeProvider`, `SafeAreaProvider`, `GestureHandlerRootView` | — |
-| `contexts/` | Context API puntual cuando Zustand es excesivo (ej. contexto de un wizard) | — |
-| `lib/` | Configuración centralizada de librerías (`dayjs`, `zod`, `sentry.ts`) | — |
-| `localization/` | i18next config, archivos de traducción `en.json`/`es.json` | — |
-| `storage/` | Adaptadores MMKV/SecureStore/SQLite con interfaz única | — |
-| `permissions/` | Helpers de `expo-camera`, `expo-location`, estado y solicitud | — |
-| `analytics/` | Wrapper único (`track(event, props)`) que delega al SDK real | — |
-| `notifications/` | Registro de push token, manejo de listeners, notificaciones locales | — |
-| `utils/` | Funciones puras sin dependencias de React | — |
-| `constants/` | Enums, regex, límites de negocio | — |
-| `types/` | Tipos compartidos (`ApiResponse<T>`, `Nullable<T>`) | — |
-| `config/` | `env.ts`, feature flags, `app.config.ts` | — |
+| Carpeta               | Responsabilidad                                                                                   | Reglas de dependencia                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `bootstrap/`          | `App.tsx`, `index.ts`, composición de providers, splash/bootstrap, error boundary raíz            | Puede importar de cualquier capa                                                            |
+| `navigation/`         | Stacks, tabs, linking config, `RootParamList` tipado, `AuthGuard`                                 | Importa `features/*/screens`, nunca al revés                                                |
+| `features/<feature>/` | `screens/`, `components/`, `hooks/`, `api/`, `store/`, `types.ts` propios del dominio             | No debe importar de otro `feature` directamente (comunicación vía `store` global o eventos) |
+| `screens/`            | Pantallas transversales (Splash, NotFound, Maintenance)                                           | —                                                                                           |
+| `components/`         | Componentes "tontos" reutilizables (Button, Card, Input)                                          | No conoce features ni API                                                                   |
+| `hooks/`              | Hooks genéricos (`useDebounce`, `useAppState`)                                                    | No conoce features                                                                          |
+| `services/`           | Wrappers de SDKs nativos/externos (push, deep link, permisos)                                     | Consumido por `features` y `providers`                                                      |
+| `api/`                | Instancia Axios, interceptores, definición de endpoints y DTOs                                    | Es la única capa que conoce HTTP                                                            |
+| `store/`              | Stores Zustand _globales_ (sesión, tema, feature flags)                                           | Los stores locales de un feature viven en `features/<feature>/store`                        |
+| `theme/`              | Tokens (color, spacing, typography), `ThemeProvider`                                              | —                                                                                           |
+| `providers/`          | Composición: `QueryClientProvider`, `ThemeProvider`, `SafeAreaProvider`, `GestureHandlerRootView` | —                                                                                           |
+| `contexts/`           | Context API puntual cuando Zustand es excesivo (ej. contexto de un wizard)                        | —                                                                                           |
+| `lib/`                | Configuración centralizada de librerías (`dayjs`, `zod`, `sentry.ts`)                             | —                                                                                           |
+| `localization/`       | i18next config, archivos de traducción `en.json`/`es.json`                                        | —                                                                                           |
+| `storage/`            | Adaptadores MMKV/SecureStore/SQLite con interfaz única                                            | —                                                                                           |
+| `permissions/`        | Helpers de `expo-camera`, `expo-location`, estado y solicitud                                     | —                                                                                           |
+| `analytics/`          | Wrapper único (`track(event, props)`) que delega al SDK real                                      | —                                                                                           |
+| `notifications/`      | Registro de push token, manejo de listeners, notificaciones locales                               | —                                                                                           |
+| `utils/`              | Funciones puras sin dependencias de React                                                         | —                                                                                           |
+| `constants/`          | Enums, regex, límites de negocio                                                                  | —                                                                                           |
+| `types/`              | Tipos compartidos (`ApiResponse<T>`, `Nullable<T>`)                                               | —                                                                                           |
+| `config/`             | `env.ts`, feature flags, `app.config.ts`                                                          | —                                                                                           |
 
 **Regla de oro:** las dependencias fluyen `app → navigation → features → (components, hooks, services, api, store, theme, lib)`. Nunca al revés. Esto es lo que permite testear y extraer un `feature` sin arrastrar toda la app.
 
@@ -161,13 +163,13 @@ e2e/                  # Tests Maestro/Detox
 
 ## 3. Gestión de estado
 
-| Opción | Cuándo usarla | Veredicto para Barber-core |
-|---|---|---|
-| **Zustand** | Estado global de cliente: sesión, tema, filtros de UI persistentes, carrito de reserva en progreso | ✅ Elegido — API mínima, sin boilerplate, selectors granulares evitan renders innecesarios, fácil de testear (es solo una función) |
-| **Redux Toolkit** | Equipos grandes que ya requieren time-travel debugging, middlewares complejos, normalización estricta | Solo si el equipo/legacy ya lo exige. Más ceremonia de la que Barber-core necesita hoy |
-| **MobX** | Apps con estado muy reactivo/mutable (ej. editores en tiempo real) | No aplica al dominio (reservas, catálogo, perfil) |
-| **Jotai** | Estado atómico muy granular, ideal para formularios complejos | Válido como complemento en un feature puntual, no como estándar global |
-| **Context API** | Estado de bajo cambio, alcance acotado (tema de un wizard, un modal) | Usar solo para casos locales — **no** para estado que cambia con frecuencia (re-renderiza todo el árbol) |
+| Opción            | Cuándo usarla                                                                                         | Veredicto para Barber-core                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Zustand**       | Estado global de cliente: sesión, tema, filtros de UI persistentes, carrito de reserva en progreso    | ✅ Elegido — API mínima, sin boilerplate, selectors granulares evitan renders innecesarios, fácil de testear (es solo una función) |
+| **Redux Toolkit** | Equipos grandes que ya requieren time-travel debugging, middlewares complejos, normalización estricta | Solo si el equipo/legacy ya lo exige. Más ceremonia de la que Barber-core necesita hoy                                             |
+| **MobX**          | Apps con estado muy reactivo/mutable (ej. editores en tiempo real)                                    | No aplica al dominio (reservas, catálogo, perfil)                                                                                  |
+| **Jotai**         | Estado atómico muy granular, ideal para formularios complejos                                         | Válido como complemento en un feature puntual, no como estándar global                                                             |
+| **Context API**   | Estado de bajo cambio, alcance acotado (tema de un wizard, un modal)                                  | Usar solo para casos locales — **no** para estado que cambia con frecuencia (re-renderiza todo el árbol)                           |
 
 ### 3.1 Regla de decisión: ¿estado local, global de cliente, o de servidor?
 
@@ -420,12 +422,12 @@ export const linkingConfig: LinkingOptions<RootStackParamList> = {
 
 ## 6. Manejo de configuración por ambiente
 
-| Ambiente | Bundle ID / Package | API URL | Uso |
-|---|---|---|---|
-| Development | `app.barbercore.dev` | `api-dev.barbercore.app` | Dev diario, Dev Client con hot reload |
-| QA | `app.barbercore.qa` | `api-qa.barbercore.app` | Builds para QA interno (EAS internal distribution) |
-| Staging | `app.barbercore.staging` | `api-staging.barbercore.app` | Pre-producción, réplica de prod |
-| Production | `app.barbercore` | `api.barbercore.app` | Store (App Store / Play Store) |
+| Ambiente    | Bundle ID / Package      | API URL                      | Uso                                                |
+| ----------- | ------------------------ | ---------------------------- | -------------------------------------------------- |
+| Development | `app.barbercore.dev`     | `api-dev.barbercore.app`     | Dev diario, Dev Client con hot reload              |
+| QA          | `app.barbercore.qa`      | `api-qa.barbercore.app`      | Builds para QA interno (EAS internal distribution) |
+| Staging     | `app.barbercore.staging` | `api-staging.barbercore.app` | Pre-producción, réplica de prod                    |
+| Production  | `app.barbercore`         | `api.barbercore.app`         | Store (App Store / Play Store)                     |
 
 - **`app.config.ts`** dinámico (en vez de `app.json` estático) que lee `process.env.APP_ENV` y retorna `name`, `bundleIdentifier`, `icon`, `extra` distintos por ambiente.
 - **`.env.development` / `.env.qa` / `.env.staging` / `.env.production`** cargados con `react-native-dotenv` o `expo-env` + `EAS Secrets` para valores sensibles en CI (nunca committear `.env.production` con secretos reales).
@@ -453,12 +455,12 @@ Fallar rápido (`parse` lanza en boot si falta una variable) es preferible a un 
 
 ## 7. Persistencia local
 
-| Storage | Tipo de dato | Por qué |
-|---|---|---|
-| **MMKV** | Preferencias de UI, cache ligera, estado de Zustand persistido, flags de onboarding | Sync, ~30x más rápido que AsyncStorage, respaldado en C++ (JSI) |
-| **AsyncStorage** | Solo si una librería de terceros lo exige como dependencia obligatoria | Evitar como elección primaria — API async y más lenta |
-| **expo-secure-store / react-native-keychain** | Tokens (access/refresh), credenciales biométricas, cualquier secreto | Cifrado por el Keychain (iOS) / Keystore (Android), respaldado por hardware cuando el device lo soporta |
-| **SQLite (Drizzle ORM / expo-sqlite)** | Datos relacionales, catálogo de servicios offline, historial de citas para uso sin conexión | Consultas relacionales reales, soporta migraciones versionadas, mejor que "objetos grandes en KV" para listas que crecen |
+| Storage                                       | Tipo de dato                                                                                | Por qué                                                                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **MMKV**                                      | Preferencias de UI, cache ligera, estado de Zustand persistido, flags de onboarding         | Sync, ~30x más rápido que AsyncStorage, respaldado en C++ (JSI)                                                          |
+| **AsyncStorage**                              | Solo si una librería de terceros lo exige como dependencia obligatoria                      | Evitar como elección primaria — API async y más lenta                                                                    |
+| **expo-secure-store / react-native-keychain** | Tokens (access/refresh), credenciales biométricas, cualquier secreto                        | Cifrado por el Keychain (iOS) / Keystore (Android), respaldado por hardware cuando el device lo soporta                  |
+| **SQLite (Drizzle ORM / expo-sqlite)**        | Datos relacionales, catálogo de servicios offline, historial de citas para uso sin conexión | Consultas relacionales reales, soporta migraciones versionadas, mejor que "objetos grandes en KV" para listas que crecen |
 
 Regla práctica: si el dato es un **secreto** → Keychain/SecureStore. Si es **clave-valor simple y no sensible** → MMKV. Si es **relacional o requiere consultas/filtrado offline** → SQLite.
 
@@ -468,11 +470,11 @@ Regla práctica: si el dato es un **secreto** → Keychain/SecureStore. Si es **
 
 ### 8.1 Comparación de librerías de estilos
 
-| Librería | Ventaja | Desventaja |
-|---|---|---|
-| **NativeWind v4** | Sintaxis Tailwind (familiar, alta velocidad de equipo), compila a StyleSheet nativo | Requiere disciplina para no romper la consistencia con clases libres |
-| **Tamagui** | Compilador que optimiza estilos y animaciones en build time, mejor rendimiento en listas pesadas | Curva de aprendizaje mayor, ecosistema más chico |
-| **Restyle (Shopify)** | Tipado fuerte de tokens, muy explícito | Más verboso, menos velocidad de desarrollo |
+| Librería              | Ventaja                                                                                          | Desventaja                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **NativeWind v4**     | Sintaxis Tailwind (familiar, alta velocidad de equipo), compila a StyleSheet nativo              | Requiere disciplina para no romper la consistencia con clases libres |
+| **Tamagui**           | Compilador que optimiza estilos y animaciones en build time, mejor rendimiento en listas pesadas | Curva de aprendizaje mayor, ecosistema más chico                     |
+| **Restyle (Shopify)** | Tipado fuerte de tokens, muy explícito                                                           | Más verboso, menos velocidad de desarrollo                           |
 
 **Decisión:** **NativeWind v4** sobre un set de **primitivos propios** (`Box`, `Text`, `Button`, `Card`) que envuelven `className`, para no acoplar toda la app a clases de Tailwind desperdigadas y mantener un Design System real.
 
@@ -528,7 +530,7 @@ src/localization/
 │   └── en/booking.json
 ```
 
-- Namespaces por feature (`booking`, `auth`, `common`) para evitar un único archivo gigante y permitir *lazy loading* de traducciones si la app crece a muchos idiomas.
+- Namespaces por feature (`booking`, `auth`, `common`) para evitar un único archivo gigante y permitir _lazy loading_ de traducciones si la app crece a muchos idiomas.
 - Formateo de fecha/moneda con `dayjs` (locale plugin) — **no** `Intl` puro en Hermes sin polyfills si se soportan RN < 0.74 (a partir de 0.74/Hermes moderno, `Intl` ya viene completo, pero fijar esto como chequeo en el roadmap).
 
 ---
@@ -579,15 +581,15 @@ export async function unlockWithBiometrics() {
 
 ## 11. Manejo de errores
 
-| Capa | Herramienta | Propósito |
-|---|---|---|
-| Render tree | `react-error-boundary` (Error Boundary raíz + por sección crítica) | Evita pantalla en blanco total, permite "retry" localizado |
-| Excepciones JS/nativas | **Sentry** (`@sentry/react-native`) | Crash reporting, breadcrumbs, source maps automáticos |
-| Errores de red | `ApiError` normalizado en `api/errors/ApiError.ts` | Mensajes consistentes, códigos mapeados a UI (ej. `NETWORK_ERROR`, `VALIDATION_ERROR`) |
-| Errores no capturados / promesas | `ErrorUtils.setGlobalHandler` + `Promise` rejection tracking de Sentry | Último recurso antes de crash total |
+| Capa                             | Herramienta                                                            | Propósito                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Render tree                      | `react-error-boundary` (Error Boundary raíz + por sección crítica)     | Evita pantalla en blanco total, permite "retry" localizado                             |
+| Excepciones JS/nativas           | **Sentry** (`@sentry/react-native`)                                    | Crash reporting, breadcrumbs, source maps automáticos                                  |
+| Errores de red                   | `ApiError` normalizado en `api/errors/ApiError.ts`                     | Mensajes consistentes, códigos mapeados a UI (ej. `NETWORK_ERROR`, `VALIDATION_ERROR`) |
+| Errores no capturados / promesas | `ErrorUtils.setGlobalHandler` + `Promise` rejection tracking de Sentry | Último recurso antes de crash total                                                    |
 
 ```tsx
-// src/app/App.tsx (fragmento)
+// src/bootstrap/App.tsx (fragmento)
 <ErrorBoundary FallbackComponent={GlobalErrorFallback} onError={Sentry.captureException}>
   <RootNavigator />
 </ErrorBoundary>
@@ -599,12 +601,12 @@ Cada `feature` puede envolver secciones críticas (ej. el flujo de pago) en su p
 
 ## 12. Testing
 
-| Tipo | Herramienta | Alcance |
-|---|---|---|
-| Unit | **Jest** + `@testing-library/react-native` | Hooks, utils, stores, componentes aislados |
-| Integration | Jest + RTL + MSW (`msw` o mocks de Axios) | Flujo de un feature completo (ej. formulario de reserva) con API mockeada |
-| E2E | **Maestro** | Flujos críticos reales sobre build de Dev Client/EAS (login → reserva → confirmación) |
-| Contract/tipado | `tsc --noEmit` en CI | Rompe el build ante cualquier `any` implícito o contrato roto |
+| Tipo            | Herramienta                                | Alcance                                                                               |
+| --------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Unit            | **Jest** + `@testing-library/react-native` | Hooks, utils, stores, componentes aislados                                            |
+| Integration     | Jest + RTL + MSW (`msw` o mocks de Axios)  | Flujo de un feature completo (ej. formulario de reserva) con API mockeada             |
+| E2E             | **Maestro**                                | Flujos críticos reales sobre build de Dev Client/EAS (login → reserva → confirmación) |
+| Contract/tipado | `tsc --noEmit` en CI                       | Rompe el build ante cualquier `any` implícito o contrato roto                         |
 
 ```
 src/features/booking/
@@ -637,15 +639,15 @@ Cobertura recomendada como gate de CI: **≥70% en `utils/`, `hooks/`, `store/`*
 
 ## 14. Seguridad
 
-| Práctica | Herramienta / Enfoque |
-|---|---|
-| Almacenamiento seguro | `expo-secure-store` (iOS Keychain / Android Keystore) para tokens y secretos |
-| Certificate pinning | `react-native-ssl-pinning` o config nativa (`NSPinnedDomains` en iOS / Network Security Config en Android) contra la API de producción |
-| Validación de certificados | TLS estricto, sin `rejectUnauthorized: false` en ningún ambiente productivo |
-| Ofuscación | Hermes bytecode (base) + ProGuard/R8 habilitado en release de Android; evaluar herramientas de ofuscación adicionales solo si el riesgo de negocio lo justifica |
-| Protección de secretos | Ningún secreto de backend en el bundle JS; `EAS Secrets`/GitHub Secrets para credenciales de CI; `.env*` con valores reales fuera de git |
-| Detección de root/jailbreak | `jail-monkey` — usar para **degradar funcionalidad sensible** (ej. bloquear pagos), no para bloquear la app entera (falsos positivos existen) |
-| Ingeniería inversa | Deep linking y endpoints sensibles siempre validados server-side — nunca confiar en lógica de negocio solo del lado cliente |
+| Práctica                    | Herramienta / Enfoque                                                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Almacenamiento seguro       | `expo-secure-store` (iOS Keychain / Android Keystore) para tokens y secretos                                                                                    |
+| Certificate pinning         | `react-native-ssl-pinning` o config nativa (`NSPinnedDomains` en iOS / Network Security Config en Android) contra la API de producción                          |
+| Validación de certificados  | TLS estricto, sin `rejectUnauthorized: false` en ningún ambiente productivo                                                                                     |
+| Ofuscación                  | Hermes bytecode (base) + ProGuard/R8 habilitado en release de Android; evaluar herramientas de ofuscación adicionales solo si el riesgo de negocio lo justifica |
+| Protección de secretos      | Ningún secreto de backend en el bundle JS; `EAS Secrets`/GitHub Secrets para credenciales de CI; `.env*` con valores reales fuera de git                        |
+| Detección de root/jailbreak | `jail-monkey` — usar para **degradar funcionalidad sensible** (ej. bloquear pagos), no para bloquear la app entera (falsos positivos existen)                   |
+| Ingeniería inversa          | Deep linking y endpoints sensibles siempre validados server-side — nunca confiar en lógica de negocio solo del lado cliente                                     |
 
 ---
 
@@ -662,16 +664,16 @@ Cobertura recomendada como gate de CI: **≥70% en `utils/`, `hooks/`, `store/`*
 
 ## 16. Integración con servicios nativos
 
-| Servicio | Librería | Carpeta |
-|---|---|---|
-| Push Notifications | `expo-notifications` | `src/notifications/` |
-| Cámara | `expo-camera` / `expo-image-picker` | `src/permissions/`, `src/features/profile/` |
-| Galería | `expo-image-picker` | idem |
-| GPS | `expo-location` | `src/permissions/`, `src/features/booking/` (barberías cercanas) |
-| Bluetooth | `react-native-ble-plx` (si se requiere hardware, ej. terminal de pago) | módulo aislado en `src/services/ble/` |
-| NFC | `react-native-nfc-manager` | `src/services/nfc/` |
-| Compartir archivos | `expo-sharing` | `src/services/share/` |
-| Descargas/Uploads | `expo-file-system` + `apiClient` (multipart) | `src/services/files/` |
+| Servicio           | Librería                                                               | Carpeta                                                          |
+| ------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Push Notifications | `expo-notifications`                                                   | `src/notifications/`                                             |
+| Cámara             | `expo-camera` / `expo-image-picker`                                    | `src/permissions/`, `src/features/profile/`                      |
+| Galería            | `expo-image-picker`                                                    | idem                                                             |
+| GPS                | `expo-location`                                                        | `src/permissions/`, `src/features/booking/` (barberías cercanas) |
+| Bluetooth          | `react-native-ble-plx` (si se requiere hardware, ej. terminal de pago) | módulo aislado en `src/services/ble/`                            |
+| NFC                | `react-native-nfc-manager`                                             | `src/services/nfc/`                                              |
+| Compartir archivos | `expo-sharing`                                                         | `src/services/share/`                                            |
+| Descargas/Uploads  | `expo-file-system` + `apiClient` (multipart)                           | `src/services/files/`                                            |
 
 Todos exponen una **interfaz propia** en `services/` que envuelve el SDK (no se consume el SDK de terceros directamente desde un `feature`), para poder mockear en tests y cambiar de proveedor sin tocar la capa de negocio.
 
@@ -701,29 +703,29 @@ flowchart LR
 
 ## 18. Dependencias principales
 
-| Librería | Propósito | Motivo de elección | Alternativas | Madurez |
-|---|---|---|---|---|
-| `expo` | Framework/toolchain | CNG + EAS + módulos nativos mantenidos en conjunto | RN CLI puro | Muy alta |
-| `typescript` | Tipado estático | Estándar de facto | Flow | Muy alta |
-| `zustand` | Estado global cliente | Mínimo boilerplate, selectors eficientes | Redux Toolkit, Jotai | Alta |
-| `@tanstack/react-query` | Estado de servidor/cache | Cache, invalidación, retries, offline out-of-the-box | SWR, RTK Query | Muy alta |
-| `axios` | Cliente HTTP | Interceptores maduros, amplia adopción | `ky`, `fetch` nativo | Muy alta |
-| `zod` | Validación runtime | Infiere tipos TS desde el schema (single source of truth) | `yup`, `io-ts` | Alta |
-| `@react-navigation/native` (v7) | Navegación | Estándar de la comunidad, tipado robusto, deep linking maduro | Expo Router | Muy alta |
-| `nativewind` | Estilos | Velocidad de equipo (Tailwind), compila a StyleSheet | Tamagui, Restyle | Alta |
-| `react-native-mmkv` | Persistencia KV | Rendimiento, sync API | AsyncStorage | Alta |
-| `drizzle-orm` + `expo-sqlite` | Persistencia relacional/offline | ORM tipado, migraciones versionadas | WatermelonDB, Realm | Media-alta (Drizzle en RN es reciente pero estable) |
-| `expo-secure-store` | Secretos | Cifrado por OS, API simple | `react-native-keychain` | Alta |
-| `react-native-reanimated` | Animaciones | Corre en UI thread, estándar de facto | `Animated` core | Muy alta |
-| `react-native-gesture-handler` | Gestos | Requerido por Reanimated/Navigation | — | Muy alta |
-| `@sentry/react-native` | Crash/error reporting | Source maps automáticos, breadcrumbs, performance tracing | Bugsnag | Muy alta |
-| `i18next` / `react-i18next` | Internacionalización | Estándar de facto en JS | `lingui`, `formatjs` | Muy alta |
-| `dayjs` | Fechas | Ligero, API similar a Moment, plugins de locale | `date-fns`, `luxon` | Muy alta |
-| `@shopify/flash-list` | Listas performantes | Recycling real de vistas | `FlatList` | Alta |
-| `expo-image` | Imágenes | Cache y decodificación optimizadas | `react-native-fast-image` | Alta |
-| `jest` + `@testing-library/react-native` | Testing unit/integration | Estándar de facto RN | — | Muy alta |
-| `maestro` | Testing E2E | Setup declarativo, rápido, buena integración CI | Detox | Alta |
-| `jail-monkey` | Detección root/jailbreak | Simple, mantenida | `react-native-device-info` (parcial) | Media |
+| Librería                                 | Propósito                       | Motivo de elección                                            | Alternativas                         | Madurez                                             |
+| ---------------------------------------- | ------------------------------- | ------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------- |
+| `expo`                                   | Framework/toolchain             | CNG + EAS + módulos nativos mantenidos en conjunto            | RN CLI puro                          | Muy alta                                            |
+| `typescript`                             | Tipado estático                 | Estándar de facto                                             | Flow                                 | Muy alta                                            |
+| `zustand`                                | Estado global cliente           | Mínimo boilerplate, selectors eficientes                      | Redux Toolkit, Jotai                 | Alta                                                |
+| `@tanstack/react-query`                  | Estado de servidor/cache        | Cache, invalidación, retries, offline out-of-the-box          | SWR, RTK Query                       | Muy alta                                            |
+| `axios`                                  | Cliente HTTP                    | Interceptores maduros, amplia adopción                        | `ky`, `fetch` nativo                 | Muy alta                                            |
+| `zod`                                    | Validación runtime              | Infiere tipos TS desde el schema (single source of truth)     | `yup`, `io-ts`                       | Alta                                                |
+| `@react-navigation/native` (v7)          | Navegación                      | Estándar de la comunidad, tipado robusto, deep linking maduro | Expo Router                          | Muy alta                                            |
+| `nativewind`                             | Estilos                         | Velocidad de equipo (Tailwind), compila a StyleSheet          | Tamagui, Restyle                     | Alta                                                |
+| `react-native-mmkv`                      | Persistencia KV                 | Rendimiento, sync API                                         | AsyncStorage                         | Alta                                                |
+| `drizzle-orm` + `expo-sqlite`            | Persistencia relacional/offline | ORM tipado, migraciones versionadas                           | WatermelonDB, Realm                  | Media-alta (Drizzle en RN es reciente pero estable) |
+| `expo-secure-store`                      | Secretos                        | Cifrado por OS, API simple                                    | `react-native-keychain`              | Alta                                                |
+| `react-native-reanimated`                | Animaciones                     | Corre en UI thread, estándar de facto                         | `Animated` core                      | Muy alta                                            |
+| `react-native-gesture-handler`           | Gestos                          | Requerido por Reanimated/Navigation                           | —                                    | Muy alta                                            |
+| `@sentry/react-native`                   | Crash/error reporting           | Source maps automáticos, breadcrumbs, performance tracing     | Bugsnag                              | Muy alta                                            |
+| `i18next` / `react-i18next`              | Internacionalización            | Estándar de facto en JS                                       | `lingui`, `formatjs`                 | Muy alta                                            |
+| `dayjs`                                  | Fechas                          | Ligero, API similar a Moment, plugins de locale               | `date-fns`, `luxon`                  | Muy alta                                            |
+| `@shopify/flash-list`                    | Listas performantes             | Recycling real de vistas                                      | `FlatList`                           | Alta                                                |
+| `expo-image`                             | Imágenes                        | Cache y decodificación optimizadas                            | `react-native-fast-image`            | Alta                                                |
+| `jest` + `@testing-library/react-native` | Testing unit/integration        | Estándar de facto RN                                          | —                                    | Muy alta                                            |
+| `maestro`                                | Testing E2E                     | Setup declarativo, rápido, buena integración CI               | Detox                                | Alta                                                |
+| `jail-monkey`                            | Detección root/jailbreak        | Simple, mantenida                                             | `react-native-device-info` (parcial) | Media                                               |
 
 ---
 
@@ -746,9 +748,9 @@ barber-core/
 │       ├── login.yaml
 │       └── create-booking.yaml
 ├── src/
-│   ├── app/
+│   ├── bootstrap/
 │   │   ├── App.tsx
-│   │   └── bootstrap.ts
+│   │   └── index.ts
 │   ├── analytics/
 │   │   └── track.ts
 │   ├── api/

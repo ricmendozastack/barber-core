@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config *)",
+      "Bash(chmod +x .husky/pre-commit .husky/commit-msg)",
+      "Bash(pnpm run *)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm dlx *)",
+      "Bash(timeout 40 pnpm exec expo start --web --non-interactive)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cd \"c:/Proyectos/Barber-core\" && rm -rf /tmp/barber-core-export && ls src/app/ -la)",
+      "Bash(pnpm add *)"
+    ],
+    "additionalDirectories": ["\\tmp"]
+  }
+}
